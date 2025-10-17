@@ -1,10 +1,9 @@
-﻿.venv/
-__pycache__/
+﻿data/
+!data/.gitkeep
+backend/.venv/
+frontend/node_modules/
 *.pyc
-*.pyo
-*.pyd
+__pycache__/
 *.db
 .env
-.env.*
-.DS_Store
-Thumbs.db
+backend/.env
