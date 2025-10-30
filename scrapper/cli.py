@@ -1,144 +1,47 @@
-from __future__ import annotations
-import argparse
-from sqlalchemy import create_engine, delete
-from sqlalchemy.orm import Session
+from argparse import ArgumentParser
+from pathlib import Path
+from sqlalchemy import create_engine
+import os
 
-from backend.settings import settings
-from backend.db_layer import Base, InactivePatent
+from .paths import DOWNLOADS
+from .grants import load_grants
+from .maintenance import load_maintenance
+from .derive import rebuild_inactive
 
-from .paths import ensure_dirs
-from . import maintenance as m
-from . import grants as g
-from .derive import reduce_inactive
+def get_engine():
+    url = os.getenv("DATABASE_URL")
+    assert url, "DATABASE_URL not set"
+    return create_engine(url, future=True)
 
-def _engine():
-    url = settings.database_url
-    return create_engine(url, future=True, echo=False)
+def cmd_build(args):
+    eng = get_engine()
+    g_count = load_grants(Path(args.grants_zip), eng)
+    m_count = load_maintenance(Path(args.maint_zip), eng)
+    i_count = rebuild_inactive(eng)
+    print(f"grants: {g_count}, maint: {m_count}, inactive now: {i_count}")
 
-def cmd_fetch(_):
-    ensure_dirs()
-    mz = m.fetch_latest_zip()
-    gz = g.fetch_latest_zip()
-    print(f"Downloaded:\n  {mz}\n  {gz}")
-
-def cmd_build(_):
-    paths = ensure_dirs()
-    mz = max((p for p in paths["downloads"].glob("ptmnfee2*.zip")), default=None)
-    gz = max((p for p in paths["downloads"].glob("ptblxml*.zip")), default=None)
-    if not mz or not gz:
-        raise SystemExit("Missing downloads. Run: python -m scrapper.cli fetch")
-    events = list(m.parse_zip(mz))
-    biblio_map = g.to_map(g.parse_zip(gz))
-    inactive_rows, total_seen = reduce_inactive(events, biblio_map)
-    print(f"Derived {len(inactive_rows)} inactive out of {total_seen} patents with maintenance events.")
-
-    eng = _engine()
-    Base.metadata.create_all(eng)
-    with Session(eng) as s:
-        s.execute(delete(InactivePatent))
-        s.bulk_save_objects([
-            InactivePatent(patent=row.patent, title=row.title, grant_date=row.grant_date)
-            for row in inactive_rows
-        ])
-        s.commit()
-    print("DB updated: inactive_patents replaced.")
-
-def cmd_devseed(_):
-    eng = _engine()
-    Base.metadata.create_all(eng)
-    demos = [
-        InactivePatent(patent="US7654321", title="Example Patent Title"),
-        InactivePatent(patent="US8000000", title="Polymer nozzle for additive manufacturing"),
-        InactivePatent(patent="US9000001", title="Photovoltaic cell encapsulation method"),
-    ]
-    with Session(eng) as s:
-        s.execute(delete(InactivePatent))
-        s.bulk_save_objects(demos)
-        s.commit()
-    print("DB updated with demo rows.")
-
-def main():
-    ap = argparse.ArgumentParser(prog="scrapper", description="USPTO inactive-patent scrapper")
-    sub = ap.add_subparsers(dest="cmd")
-    sub.add_parser("fetch", help="Download latest maintenance + bibliographic ZIPs").set_defaults(func=cmd_fetch)
-    sub.add_parser("build", help="Parse and load inactive_patents into DB").set_defaults(func=cmd_build)
-    sub.add_parser("dev-seed", help="Write demo rows").set_defaults(func=cmd_devseed)
-    args = ap.parse_args()
-    if not getattr(args, "cmd", None):
-        ap.print_help(); return
-    args.func(args)
+def cmd_latest(args):
+    # Convenience if you drop the two weekly ZIPs into data/downloads/
+    eng = get_engine()
+    zips = sorted(DOWNLOADS.glob("*.zip"))
+    grants_zip = next(z for z in zips if "ipg" in z.name.lower() or "ptblxml" in z.name.lower())
+    maint_zip  = next(z for z in zips if "maint" in z.name.lower() or "ptmnfee" in z.name.lower())
+    g_count = load_grants(grants_zip, eng)
+    m_count = load_maintenance(maint_zip, eng)
+    i_count = rebuild_inactive(eng)
+    print(f"grants: {g_count}, maint: {m_count}, inactive now: {i_count}")
 
 if __name__ == "__main__":
-    main()
-from __future__ import annotations
-import argparse
-from sqlalchemy import create_engine, delete
-from sqlalchemy.orm import Session
+    ap = ArgumentParser("scrapper")
+    sp = ap.add_subparsers(dest="cmd", required=True)
 
-from backend.settings import settings
-from backend.db_layer import Base, InactivePatent
+    b = sp.add_parser("build", help="ingest specific ZIP files and derive")
+    b.add_argument("--grants-zip", required=True)
+    b.add_argument("--maint-zip", required=True)
+    b.set_defaults(func=cmd_build)
 
-from .paths import ensure_dirs
-from . import maintenance as m
-from . import grants as g
-from .derive import reduce_inactive
+    l = sp.add_parser("latest", help="ingest the two ZIPs present in data/downloads/")
+    l.set_defaults(func=cmd_latest)
 
-def _engine():
-    url = settings.database_url
-    return create_engine(url, future=True, echo=False)
-
-def cmd_fetch(_):
-    ensure_dirs()
-    mz = m.fetch_latest_zip()
-    gz = g.fetch_latest_zip()
-    print(f"Downloaded:\n  {mz}\n  {gz}")
-
-def cmd_build(_):
-    paths = ensure_dirs()
-    mz = max((p for p in paths["downloads"].glob("ptmnfee2*.zip")), default=None)
-    gz = max((p for p in paths["downloads"].glob("ptblxml*.zip")), default=None)
-    if not mz or not gz:
-        raise SystemExit("Missing downloads. Run: python -m scrapper.cli fetch")
-    events = list(m.parse_zip(mz))
-    biblio_map = g.to_map(g.parse_zip(gz))
-    inactive_rows, total_seen = reduce_inactive(events, biblio_map)
-    print(f"Derived {len(inactive_rows)} inactive out of {total_seen} patents with maintenance events.")
-
-    eng = _engine()
-    Base.metadata.create_all(eng)
-    with Session(eng) as s:
-        s.execute(delete(InactivePatent))
-        s.bulk_save_objects([
-            InactivePatent(patent=row.patent, title=row.title, grant_date=row.grant_date)
-            for row in inactive_rows
-        ])
-        s.commit()
-    print("DB updated: inactive_patents replaced.")
-
-def cmd_devseed(_):
-    eng = _engine()
-    Base.metadata.create_all(eng)
-    demos = [
-        InactivePatent(patent="US7654321", title="Example Patent Title"),
-        InactivePatent(patent="US8000000", title="Polymer nozzle for additive manufacturing"),
-        InactivePatent(patent="US9000001", title="Photovoltaic cell encapsulation method"),
-    ]
-    with Session(eng) as s:
-        s.execute(delete(InactivePatent))
-        s.bulk_save_objects(demos)
-        s.commit()
-    print("DB updated with demo rows.")
-
-def main():
-    ap = argparse.ArgumentParser(prog="scrapper", description="USPTO inactive-patent scrapper")
-    sub = ap.add_subparsers(dest="cmd")
-    sub.add_parser("fetch", help="Download latest maintenance + bibliographic ZIPs").set_defaults(func=cmd_fetch)
-    sub.add_parser("build", help="Parse and load inactive_patents into DB").set_defaults(func=cmd_build)
-    sub.add_parser("dev-seed", help="Write demo rows").set_defaults(func=cmd_devseed)
     args = ap.parse_args()
-    if not getattr(args, "cmd", None):
-        ap.print_help(); return
     args.func(args)
-
-if __name__ == "__main__":
-    main()
