@@ -1,59 +1,111 @@
 "use client";
 import { useState } from "react";
-import Header from "@/components/Header";
-import SearchForm from "@/components/SearchForm";
-import ResultsTable from "@/components/ResultsTable";
 
-type PatentHit = { patent: string; title: string; grant_date?: string | null; };
-type SearchResponse = { q: string; page: number; per_page: number; total: number; results: PatentHit[]; };
+type Hit = { patent: string; title: string; grant_date?: string | null };
+type ApiResp = { q: string; page: number; per_page: number; total: number; results: Hit[] };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000";
-
-export default function Page() {
-  const [page, setPage] = useState(1);
-  const [perPage] = useState(20);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<SearchResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function Home() {
   const [q, setQ] = useState("");
+  const [rows, setRows] = useState<Hit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const per_page = 20;
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  async function fetchSearch(query: string, p = 1) {
-    setLoading(true); setError(null); setQ(query);
+  async function go(nextPage = 1) {
+    if (!q.trim()) return;
+    setLoading(true); setErr(null);
     try {
-      const url = new URL(`${API_BASE}/search`);
-      url.searchParams.set("q", query);
-      url.searchParams.set("page", String(p));
-      url.searchParams.set("per_page", String(perPage));
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const json = (await res.json()) as SearchResponse;
-      setData(json); setPage(p);
-    } catch (e:any) { setError(e.message || "Search failed"); }
-    finally { setLoading(false); }
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/search?q=${encodeURIComponent(q)}&page=${nextPage}&per_page=${per_page}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: ApiResp = await res.json();
+      setRows(data.results); setTotal(data.total); setPage(nextPage);
+    } catch {
+      setErr("Failed to fetch"); setRows([]); setTotal(0);
+    } finally { setLoading(false); }
   }
 
-  return (
-    <main className="min-h-screen bg-white">
-      <Header />
-      <section className="mx-auto max-w-6xl px-4 py-8">
-        <SearchForm onSearch={(query)=>fetchSearch(query,1)} disabled={loading} />
-        {error && <div className="mt-6 rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{error}</div>}
-        {data ? (
-          <>
-            <div className="mt-4 text-sm text-gray-700">
-              {data.total} result{data.total===1?"":"s"} for <span className="font-medium">“{data.q}”</span>
-            </div>
-            <ResultsTable results={data.results} total={data.total} page={page} perPage={perPage} onPage={(p)=>fetchSearch(q,p)} />
-          </>
-        ) : (
-          <div className="mt-6 text-sm text-gray-600">searching for <span className="font-medium">fuel injector</span></div>
-        )}
-      </section>
-      <footer className="mt-12 border-t">
-        <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-gray-600">
+  const pages = Math.max(1, Math.ceil(total / per_page));
+  const from = total ? (page - 1) * per_page + 1 : 0;
+  const to   = total ? Math.min(page * per_page, total) : 0;
 
+  return (
+    <div className="container">
+      <h1 className="section-title">Find inactive U.S. patents</h1>
+      <div className="section-sub">
+        Search by title keyword. Results include patent number, title, and grant date.
+      </div>
+
+      <div className="search-wrap">
+        <div className="search-pill">
+          {/* magnifier svg */}
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor"
+              d="M21 20.3 16.7 16A7.5 7.5 0 1 0 16 16.7L20.3 21zM4.5 11a6.5 6.5 0 1 1 13 0a6.5 6.5 0 0 1-13 0Z" />
+          </svg>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && go(1)}
+            placeholder="Search titles"
+            aria-label="Search patents by title"
+          />
         </div>
-      </footer>
-    </main>
+        <button className="search-btn" onClick={() => go(1)} disabled={loading}>
+          {loading ? "Searching…" : "Search"}
+        </button>
+      </div>
+
+      {err && <div className="meta">{err}</div>}
+
+      {!rows.length ? (
+        <div className="meta">
+          No results yet.
+        </div>
+      ) : (
+        <>
+          <div className="meta">
+            Showing {from}–{to} of {total} results
+          </div>
+
+          <table className="table" role="grid" aria-label="Search results">
+            <tbody>
+              {rows.map((r) => (
+                <tr className="row" key={r.patent}>
+                  <td className="cell pat">{r.patent}</td>
+                  <td className="cell">{r.title}</td>
+                  <td className="cell date">{r.grant_date ?? ""}</td>
+                  <td className="cell" style={{ width: 80, textAlign: "right" }}>
+                    <a
+                      href={`https://patents.google.com/patent/${encodeURIComponent(r.patent)}`}
+                      target="_blank" rel="noreferrer"
+                    >
+                      View →
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="pager">
+            <button className="btn" onClick={() => go(Math.max(1, page - 1))} disabled={page <= 1 || loading}>
+              Prev
+            </button>
+            <span className="meta">Page {page} / {pages}</span>
+            <button className="btn" onClick={() => go(Math.min(pages, page + 1))} disabled={page >= pages || loading}>
+              Next
+            </button>
+          </div>
+        </>
+      )}
+
+      <div className="meta" style={{ marginTop: 18 }}>
+        Data from USPTO Open Data (weekly). Open-source (GPL-3.0).
+      </div>
+    </div>
   );
 }

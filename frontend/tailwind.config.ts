@@ -1,23 +1,27 @@
 import type { Config } from "tailwindcss";
 
-export default {
-  content: [
-    "./src/app/**/*.{ts,tsx}",
-    "./src/components/**/*.{ts,tsx}",
-    "./src/pages/**/*.{ts,tsx}",
-  ],
+const config: Config = {
+  content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      colors: { western: { purple: "#4F2683" } },
-      fontFamily: {
-        sans: [
-          "Helvetica Neue","Helvetica","Arial","ui-sans-serif","system-ui",
-          "Segoe UI","Roboto","Noto Sans","Liberation Sans",
-          "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol",
-        ],
+      colors: {
+        
+        uwo: {
+          purple: "#4F2683",     
+          purpleLight: "#6b42a1", 
+          lilac: "#F4EEFF",       
+          gray: "#6B7280",
+        },
       },
-      borderRadius: { xl: "0.75rem" },
+      boxShadow: {
+        card: "0 6px 18px rgba(0,0,0,0.08)",
+        inset: "inset 0 1px 0 rgba(255,255,255,0.5)",
+      },
+      borderRadius: {
+        pill: "9999px",
+      },
     },
   },
   plugins: [],
-} satisfies Config;
+};
+export default config;
