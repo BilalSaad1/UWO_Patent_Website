@@ -1,34 +1,63 @@
 from pathlib import Path
 from zipfile import ZipFile
-import csv
 from io import TextIOWrapper
 from sqlalchemy import text
+import re
 
-# The maintenance ZIP usually contains .txt or .csv (pipe/comma delimited).
-CANDIDATE_DELIMS = [",", "|", "\t", ";"]
+def _norm(s): return (s or "").strip().upper()
 
-def _guess_delim(sample: str) -> str:
-    return max(CANDIDATE_DELIMS, key=lambda d: sample.count(d))
+def _to_yyyymmdd(s: str):
+    s = (s or "").strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d{8}", s):
+        return s
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        return s.replace("-", "")
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if m:
+        mm, dd, yy = m.groups()
+        return f"{yy}{int(mm):02d}{int(dd):02d}"
+    return None
 
 def load_maintenance(zip_path: Path, engine) -> int:
+    """Handles the USPTO fixed-width, space-separated maintenance file (e.g., MaintFeeEvents_YYYYMMDD.txt)."""
     count = 0
     with ZipFile(zip_path) as zf, engine.begin() as conn:
-        # pick the first text-like file
-        name = next(n for n in zf.namelist() if n.lower().endswith((".txt",".csv")))
+        # choose largest .txt/.csv member (the big events file)
+        names = [n for n in zf.namelist() if n.lower().endswith((".txt", ".csv"))]
+        if not names:
+            return 0
+        names.sort(key=lambda n: zf.getinfo(n).file_size, reverse=True)
+        name = names[0]
+
+        lines = 0
         with zf.open(name) as fh:
-            head = fh.read(4096).decode("utf-8", "ignore")
-            delim = _guess_delim(head)
-        with zf.open(name) as fh:
-            reader = csv.DictReader(TextIOWrapper(fh, encoding="utf-8", errors="ignore"), delimiter=delim)
-            for row in reader:
-                pn = (row.get("PatentNumber") or row.get("patent") or "").strip()
-                code = (row.get("EventCode") or row.get("event_code") or "").strip().upper()
-                dt = (row.get("EventDate") or row.get("event_date") or "").strip()
-                if not pn or not code or not dt:
+            for raw in TextIOWrapper(fh, encoding="utf-8", errors="ignore"):
+                lines += 1
+                line = raw.strip()
+                if not line:
                     continue
-                conn.execute(text("""
-                    INSERT INTO maint_events_raw (patent, event_code, event_date, details)
-                    VALUES (:pn, :code, to_date(:dt,'YYYYMMDD'), to_jsonb(:row::json))
-                """), {"pn": pn, "code": code, "dt": dt, "row": row})
-                count += 1
+                parts = line.split()
+                # empirical layout from your probe:
+                # [cust_id, patent, ?, pay_date?, event_date, code]
+                if len(parts) < 6:
+                    continue
+                pn   = parts[1]
+                dt   = _to_yyyymmdd(parts[-2])
+                code = _norm(parts[-1])
+                if not pn or not dt or not code:
+                    continue
+                try:
+                    conn.execute(text("""
+                        INSERT INTO maint_events_raw (patent, event_code, event_date, details)
+                        VALUES (:pn, :code, to_date(:dt,'YYYYMMDD'), NULL)
+                    """), {"pn": pn, "code": code, "dt": dt})
+                    count += 1
+                except Exception:
+                    # ignore malformed lines/duplicates
+                    pass
+
+                if lines % 100000 == 0:
+                    print(f"[maint] read={lines:,} inserted={count:,}", flush=True)
     return count

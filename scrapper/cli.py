@@ -3,6 +3,8 @@ from pathlib import Path
 from sqlalchemy import create_engine
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
 from .paths import DOWNLOADS
 from .grants import load_grants
 from .maintenance import load_maintenance

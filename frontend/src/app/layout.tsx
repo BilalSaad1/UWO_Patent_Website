@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="title">Expired U.S. Patents</div>
             </div>
             <div style={{ marginLeft: "auto", fontSize: 13 }}>
-              <a href="https://uwo.ca" target="_blank" rel="noreferrer">uwo.ca</a>
+              <a href="https://uwo.ca" target="_blank" rel="noreferrer">UWO HomePage</a>
             </div>
           </header>
         </div>

@@ -8,17 +8,23 @@ from pydantic import BaseModel
 from settings import settings
 import db_layer as db
 
-
 app = FastAPI(title="UWO Patent Website API", version="0.1.0")
+
+# --- CORS ---
+# Keep anything you configured in settings.cors_origins, plus explicit dev origins.
+_settings_origins = [o.strip() for o in settings.cors_origins if o and o.strip()]
+_default_dev = ["http://localhost:3000", "http://127.0.0.1:3000"]
+allow_origins = sorted(set(_settings_origins + _default_dev))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins if o.strip()],
+    allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET", "OPTIONS"],   # OPTIONS for preflight
     allow_headers=["*"],
 )
 
+# --- Models ---
 class PatentHit(BaseModel):
     patent: str
     title: str
@@ -31,11 +37,13 @@ class SearchResponse(BaseModel):
     total: int
     results: List[PatentHit]
 
+# --- Lifecycle ---
 @app.on_event("startup")
 def _startup():
     db.init_db()
     db.seed_if_empty()
 
+# --- Routes ---
 @app.get("/health")
 def health():
     return {"status": "ok"}

@@ -7,8 +7,8 @@ const config: Config = {
       colors: {
         
         uwo: {
-          purple: "#4F2683",     
-          purpleLight: "#6b42a1", 
+          purple: "#481e80ff",     
+          purpleLight: "#6915d6ff", 
           lilac: "#F4EEFF",       
           gray: "#6B7280",
         },
