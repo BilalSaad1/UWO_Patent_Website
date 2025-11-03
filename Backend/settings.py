@@ -4,7 +4,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # reads backend/.env if present
 
 class Settings(BaseModel):
     cors_origins: List[str] = Field(

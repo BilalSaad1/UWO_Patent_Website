@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date
-from typing import List, Optional, Literal
+from typing import List, Optional
 
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,15 +11,14 @@ import db_layer as db
 app = FastAPI(title="UWO Patent Website API", version="0.2.0")
 
 # --- CORS ---
-_settings_origins = [o.strip() for o in settings.cors_origins if o and o.strip()]
-_default_dev = ["http://localhost:3000", "http://127.0.0.1:3000"]
-allow_origins = sorted(set(_settings_origins + _default_dev))
-
+# Allow the fixed list from env AND any *.trycloudflare.com subdomain.
+explicit = [o.strip() for o in settings.cors_origins if o and o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
+    allow_origins=explicit,
+    allow_origin_regex=r"^https://[a-z0-9-]+\.trycloudflare\.com$",
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -29,7 +28,6 @@ class PatentHit(BaseModel):
     title: str
     grant_date: Optional[date] = None
 
-
 class SearchResponse(BaseModel):
     q: str
     page: int
@@ -37,31 +35,32 @@ class SearchResponse(BaseModel):
     total: int
     results: List[PatentHit]
 
-
-# --- Lifecycle ---
+# --- Startup ---
 @app.on_event("startup")
 def _startup():
     db.init_db()
     db.seed_if_empty()
-
 
 # --- Routes ---
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+@app.get("/stats")
+def stats():
+    # quick db sanity: returns total rows in inactive_patents
+    _, total = db.search_patents(q="", page=1, per_page=1)
+    return {"total_inactive_patents": total}
 
 @app.get("/search", response_model=SearchResponse)
 def search(
-    q: str = Query(..., min_length=2, max_length=128),
+    q: str = Query(..., min_length=1, max_length=128),
     page: int = Query(1, ge=1, le=1000),
     per_page: int = Query(20, ge=1, le=100),
-
-    # NEW: filters + sorting to match the frontend
-    year_from: Optional[int] = Query(None, ge=1800, le=2100),
-    year_to: Optional[int]   = Query(None, ge=1800, le=2100),
-    sort_by: Literal["date", "title"] = Query("date"),
-    sort_dir: Literal["asc", "desc"]  = Query("desc"),
+    year_from: Optional[int] = Query(None, ge=1900, le=2100),
+    year_to:   Optional[int] = Query(None, ge=1900, le=2100),
+    sort_by:   str = Query("date", pattern="^(date|title)$"),
+    sort_dir:  str = Query("desc", pattern="^(asc|desc)$"),
 ):
     rows, total = db.search_patents(
         q=q,
@@ -72,9 +71,13 @@ def search(
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-    results = [PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date) for r in rows]
-    return SearchResponse(q=q, page=page, per_page=per_page, total=total, results=results)
-
+    return SearchResponse(
+        q=q,
+        page=page,
+        per_page=per_page,
+        total=total,
+        results=[PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date) for r in rows],
+    )
 
 @app.get("/patents/{number}", response_model=PatentHit)
 def get_patent(number: str):
