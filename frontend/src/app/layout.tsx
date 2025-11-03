@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
   title: "Expired U.S. Patents — Western University",
@@ -18,11 +19,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="kicker">Western University</div>
               <div className="title">Expired U.S. Patents</div>
             </div>
-            <div style={{ marginLeft: "auto", fontSize: 13 }}>
-              <a href="https://uwo.ca" target="_blank" rel="noreferrer">UWO HomePage</a>
-            </div>
+
+            {/* Header buttons are conditionally shown via HeaderNav */}
+            <HeaderNav />
           </header>
         </div>
+
         {children}
       </body>
     </html>

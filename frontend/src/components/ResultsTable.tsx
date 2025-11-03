@@ -1,48 +1,87 @@
 type Row = { patent: string; title: string; grant_date?: string | null };
 
+/* ---------- helpers for external links ---------- */
+
+// squash spaces like "12 440 146" -> "12440146"
+const normalizeId = (pn: string) => pn.trim().replace(/\s+/g, "");
+
+/** Build the identifier Google/USPTO expect. Kind code optional. */
+const googleId = (pn: string) => {
+  const raw = normalizeId(pn);
+
+  // Already prefixed (US, USD, USRE, USPP, etc.)
+  if (/^US/i.test(raw)) return raw;
+
+  // Design patents: D123456 -> USD123456
+  if (/^D\d+/i.test(raw)) return `USD${raw.slice(1)}`;
+
+  // Reissue/Plant/H-Patents/etc. -> add US prefix
+  if (/^(RE|PP|H|T)\d+/i.test(raw)) return `US${raw.toUpperCase()}`;
+
+  // Utility: 12440146 -> US12440146
+  return `US${raw}`;
+};
+
+/** Open the **Google Patents search list** (more reliable for very new grants). */
+const googlePatentsSearchUrl = (pn: string) =>
+  `https://patents.google.com/?q=${encodeURIComponent(googleId(pn))}&oq=${encodeURIComponent(
+    pn
+  )}`;
+
 export default function ResultsTable({ rows, total }: { rows: Row[]; total: number }) {
   if (!rows?.length) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white/60 p-10 text-center text-gray-600">
-        No results yet. Try a broader keyword (e.g., <span className="font-medium">sensor</span>).
+      <div className="card-empty">
+        No results yet. Try a broader keyword (e.g., <span className="fw-500">sensor</span>).
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="text-sm text-gray-500">Found {total.toLocaleString()} result{total === 1 ? "" : "s"}</div>
+    <div className="list">
+      <div className="meta small">Found {total.toLocaleString()} result{total === 1 ? "" : "s"}</div>
 
-      <ul className="grid gap-3">
-        {rows.map((r) => (
-          <li key={r.patent} className="rounded-xl bg-white p-4 shadow-card ring-1 ring-gray-200 hover:shadow-lg transition">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <a
-                  href={`https://patents.google.com/patent/${encodeURIComponent(r.patent)}`}
-                  target="_blank" rel="noreferrer"
-                  className="text-uwo-purple hover:underline font-medium"
-                >
-                  {r.patent}
-                </a>
-                {r.grant_date && (
-                  <span className="ml-2 rounded-full bg-uwo.lilac px-2 py-0.5 text-xs text-uwo-purple">
-                    {new Date(r.grant_date).toLocaleDateString()}
-                  </span>
-                )}
-                <div className="mt-1 text-[15px] text-gray-800">{r.title}</div>
+      <ul className="list-gap">
+        {rows.map((r) => {
+          const gpListUrl = googlePatentsSearchUrl(r.patent);
+
+          return (
+            <li key={r.patent} className="card">
+              <div className="card-main">
+                <div className="patent-line">
+                  <a
+                    href={gpListUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="patent-link"
+                    title="Open on Google Patents (search list)"
+                  >
+                    {r.patent}
+                  </a>
+                  {r.grant_date && (
+                    <span className="pill-date">
+                      {new Date(r.grant_date).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="title-line">{r.title}</div>
               </div>
 
-              <a
-                href={`https://patents.google.com/patent/${encodeURIComponent(r.patent)}`}
-                target="_blank" rel="noreferrer"
-                className="rounded-lg border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                View
-              </a>
-            </div>
-          </li>
-        ))}
+              <div className="card-actions">
+                <a
+                  href={gpListUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-outline"
+                  title="Open on Google Patents (search list)"
+                >
+                  View →
+                </a>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

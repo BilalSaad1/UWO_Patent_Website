@@ -1,37 +1,131 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type Props = { onSearch: (q: string) => void; defaultQuery?: string };
+export type SortBy = "date" | "title";
+export type SortDir = "asc" | "desc";
 
-export default function SearchForm({ onSearch, defaultQuery = "" }: Props) {
+type Props = {
+  onSearch: (params: {
+    q: string;
+    year_from?: number | null;
+    year_to?: number | null;
+    sort_by: SortBy;
+    sort_dir: SortDir;
+  }) => void;
+  defaultQuery?: string;
+  defaultYearFrom?: number | null;
+  defaultYearTo?: number | null;
+  defaultSortBy?: SortBy;
+  defaultSortDir?: SortDir;
+};
+
+export default function SearchForm({
+  onSearch,
+  defaultQuery = "",
+  defaultYearFrom = null,
+  defaultYearTo = null,
+  defaultSortBy = "date",
+  defaultSortDir = "desc",
+}: Props) {
   const [q, setQ] = useState(defaultQuery);
+  const [yearFrom, setYearFrom] = useState<number | "">(defaultYearFrom ?? "");
+  const [yearTo, setYearTo] = useState<number | "">(defaultYearTo ?? "");
+  const [sortBy, setSortBy] = useState<SortBy>(defaultSortBy);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
+
+  const years = useMemo(() => {
+    const now = new Date().getFullYear();
+    const arr: number[] = [];
+    for (let y = now; y >= 1976; y--) arr.push(y);
+    return arr;
+  }, []);
+
+  function submit() {
+    onSearch({
+      q,
+      year_from: yearFrom === "" ? null : Number(yearFrom),
+      year_to: yearTo === "" ? null : Number(yearTo),
+      sort_by: sortBy,
+      sort_dir: sortDir,
+    });
+  }
+
+  // “Enter” submits
+  function keyHandler(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") submit();
+  }
 
   return (
-    <div className="mb-6">
-      <label htmlFor="q" className="sr-only">Search patents</label>
-      <div className="flex items-center gap-2 rounded-pill bg-uwo.lilac/50 p-1">
-        <div className="flex w-full items-center rounded-pill bg-white pl-4 pr-1 shadow-card ring-1 ring-gray-200">
-          <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60">
-            <path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.471 6.471 0 0 0 1.57-4.23A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20zM4 9.5C4 6.46 6.46 4 9.5 4S15 6.46 15 9.5 12.54 15 9.5 15 4 12.54 4 9.5z"/>
+    <div className="space-y-2">
+      {/* search bar */}
+      <div className="search-wrap">
+        <div className="search-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ opacity: 0.7 }}>
+            <path
+              fill="currentColor"
+              d="M21 20.3 16.7 16A7.5 7.5 0 1 0 16 16.7L20.3 21zM4.5 11a6.5 6.5 0 1 1 13 0a6.5 6.5 0 0 1-13 0Z"
+            />
           </svg>
           <input
-            id="q"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onSearch(q)}
-            placeholder="Search titles (e.g., polymer, injector, valve)"
-            className="w-full bg-transparent px-3 py-3 outline-none placeholder:text-gray-400"
+            onKeyDown={keyHandler}
+            placeholder="Search titles (e.g., sensor, polymer, valve)"
+            aria-label="Search patents by title"
           />
-          <button
-            onClick={() => onSearch(q)}
-            className="rounded-pill bg-uwo-purple px-5 py-2.5 text-white transition hover:bg-uwo-purple/90 active:scale-[0.99]"
-            aria-label="Search"
-          >
-            Search
-          </button>
         </div>
+        <button className="search-btn" onClick={submit}>Search</button>
       </div>
-      <p className="mt-2 text-xs text-gray-500">Tip: results show currently inactive (lapsed) patents.</p>
+
+      {/* filters + sort */}
+      <div className="filters-row">
+        <div className="filters-group">
+          <label className="filters-label">Year from</label>
+          <select
+            value={yearFrom === "" ? "" : String(yearFrom)}
+            onChange={(e) => setYearFrom(e.target.value === "" ? "" : Number(e.target.value))}
+            className="filters-select"
+          >
+            <option value="">Any</option>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <label className="filters-label">Year to</label>
+          <select
+            value={yearTo === "" ? "" : String(yearTo)}
+            onChange={(e) => setYearTo(e.target.value === "" ? "" : Number(e.target.value))}
+            className="filters-select"
+          >
+            <option value="">Any</option>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <label className="filters-label">Sort by</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} className="filters-select">
+            <option value="date">Grant date</option>
+            <option value="title">Title</option>
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <label className="filters-label">Order</label>
+          <select value={sortDir} onChange={(e) => setSortDir(e.target.value as SortDir)} className="filters-select">
+            <option value="desc">Desc</option>
+            <option value="asc">Asc</option>
+          </select>
+        </div>
+
+        <div className="filters-spacer" />
+        <button className="btn-outline" onClick={submit}>Apply</button>
+      </div>
     </div>
   );
 }

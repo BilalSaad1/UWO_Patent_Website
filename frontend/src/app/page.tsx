@@ -1,5 +1,8 @@
 "use client";
+
 import { useState } from "react";
+import ResultsTable from "@/components/ResultsTable";
+import SearchForm, { SortBy, SortDir } from "@/components/SearchForm";
 
 type Hit = { patent: string; title: string; grant_date?: string | null };
 type ApiResp = { q: string; page: number; per_page: number; total: number; results: Hit[] };
@@ -13,19 +16,57 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function go(nextPage = 1) {
-    if (!q.trim()) return;
+  // filters / sort state
+  const [yearFrom, setYearFrom] = useState<number | null>(null);
+  const [yearTo, setYearTo] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  async function fetchResults(nextPage = 1, params?: {
+    q?: string; year_from?: number | null; year_to?: number | null;
+    sort_by?: SortBy; sort_dir?: SortDir;
+  }) {
+    const _q = (params?.q ?? q).trim();
+    if (!_q) return;
+
+    const yf = params?.year_from ?? yearFrom;
+    const yt = params?.year_to ?? yearTo;
+    const sb = params?.sort_by ?? sortBy;
+    const sd = params?.sort_dir ?? sortDir;
+
     setLoading(true); setErr(null);
+
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE}/search?q=${encodeURIComponent(q)}&page=${nextPage}&per_page=${per_page}`
-      );
+      const base = process.env.NEXT_PUBLIC_API_BASE!;
+      const usp = new URLSearchParams({
+        q: _q,
+        page: String(nextPage),
+        per_page: String(per_page),
+        sort_by: sb,
+        sort_dir: sd,
+      });
+      if (yf) usp.set("year_from", String(yf));
+      if (yt) usp.set("year_to", String(yt));
+
+      const res = await fetch(`${base}/search?${usp.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: ApiResp = await res.json();
-      setRows(data.results); setTotal(data.total); setPage(nextPage);
-    } catch {
-      setErr("Failed to fetch"); setRows([]); setTotal(0);
-    } finally { setLoading(false); }
+
+      setQ(_q);
+      setYearFrom(yf ?? null);
+      setYearTo(yt ?? null);
+      setSortBy(sb);
+      setSortDir(sd);
+
+      setRows(data.results);
+      setTotal(data.total);
+      setPage(nextPage);
+    } catch (e) {
+      setErr("Failed to fetch");
+      setRows([]); setTotal(0);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const pages = Math.max(1, Math.ceil(total / per_page));
@@ -35,68 +76,42 @@ export default function Home() {
   return (
     <div className="container">
       <h1 className="section-title">Find inactive U.S. patents</h1>
-      <div className="section-sub">
-        Search by title keyword. Results include patent number, title, and grant date.
-      </div>
+      <div className="section-sub">Search by title keyword. Results include patent number, title, and grant date.</div>
 
-      <div className="search-wrap">
-        <div className="search-pill">
-          {/* magnifier svg */}
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor"
-              d="M21 20.3 16.7 16A7.5 7.5 0 1 0 16 16.7L20.3 21zM4.5 11a6.5 6.5 0 1 1 13 0a6.5 6.5 0 0 1-13 0Z" />
-          </svg>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && go(1)}
-            placeholder="Search titles"
-            aria-label="Search patents by title"
-          />
-        </div>
-        <button className="search-btn" onClick={() => go(1)} disabled={loading}>
-          {loading ? "Searching…" : "Search"}
-        </button>
-      </div>
+      <SearchForm
+        defaultQuery={q}
+        defaultYearFrom={yearFrom}
+        defaultYearTo={yearTo}
+        defaultSortBy={sortBy}
+        defaultSortDir={sortDir}
+        onSearch={(p) => fetchResults(1, p)}
+      />
 
       {err && <div className="meta">{err}</div>}
 
       {!rows.length ? (
-        <div className="meta">
-          No results yet.
-        </div>
+        <div className="meta">No results yet.</div>
       ) : (
         <>
+          {/* quick totals */}
           <div className="meta">
-            Showing {from}–{to} of {total} results
+            Found <strong>{total.toLocaleString()}</strong> inactive patent{total===1?"":"s"}
+            {q ? <> for “<strong>{q}</strong>”</> : null}
+            {yearFrom ? <> • from <strong>{yearFrom}</strong></> : null}
+            {yearTo ? <> • to <strong>{yearTo}</strong></> : null}
+            <> • sorted by <strong>{sortBy==="date"?"grant date":"title"}</strong> ({sortDir})</>
           </div>
 
-          <table className="table" role="grid" aria-label="Search results">
-            <tbody>
-              {rows.map((r) => (
-                <tr className="row" key={r.patent}>
-                  <td className="cell pat">{r.patent}</td>
-                  <td className="cell">{r.title}</td>
-                  <td className="cell date">{r.grant_date ?? ""}</td>
-                  <td className="cell" style={{ width: 80, textAlign: "right" }}>
-                    <a
-                      href={`https://patents.google.com/patent/${encodeURIComponent(r.patent)}`}
-                      target="_blank" rel="noreferrer"
-                    >
-                      View →
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="meta">Showing {from}–{to} of {total} results</div>
+
+          <ResultsTable rows={rows} total={total} />
 
           <div className="pager">
-            <button className="btn" onClick={() => go(Math.max(1, page - 1))} disabled={page <= 1 || loading}>
+            <button className="btn" onClick={() => fetchResults(Math.max(1, page - 1))} disabled={page <= 1 || loading}>
               Prev
             </button>
             <span className="meta">Page {page} / {pages}</span>
-            <button className="btn" onClick={() => go(Math.min(pages, page + 1))} disabled={page >= pages || loading}>
+            <button className="btn" onClick={() => fetchResults(Math.min(pages, page + 1))} disabled={page >= pages || loading}>
               Next
             </button>
           </div>
