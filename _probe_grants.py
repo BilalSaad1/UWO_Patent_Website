@@ -22,9 +22,7 @@ with ZipFile(G) as z:
                 continue
             count += 1
             if first is None:
-                # quick helper to snag a couple fields without worrying about namespaces
                 def text_first(e, names):
-                    # names is a list like ["publication-reference","document-id","doc-number"]
                     cur = e
                     for name in names:
                         found = None

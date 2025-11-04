@@ -24,7 +24,6 @@ def load_maintenance(zip_path: Path, engine) -> int:
     """Handles the USPTO fixed-width, space-separated maintenance file (e.g., MaintFeeEvents_YYYYMMDD.txt)."""
     count = 0
     with ZipFile(zip_path) as zf, engine.begin() as conn:
-        # choose largest .txt/.csv member (the big events file)
         names = [n for n in zf.namelist() if n.lower().endswith((".txt", ".csv"))]
         if not names:
             return 0
@@ -39,8 +38,6 @@ def load_maintenance(zip_path: Path, engine) -> int:
                 if not line:
                     continue
                 parts = line.split()
-                # empirical layout from your probe:
-                # [cust_id, patent, ?, pay_date?, event_date, code]
                 if len(parts) < 6:
                     continue
                 pn   = parts[1]
@@ -55,7 +52,6 @@ def load_maintenance(zip_path: Path, engine) -> int:
                     """), {"pn": pn, "code": code, "dt": dt})
                     count += 1
                 except Exception:
-                    # ignore malformed lines/duplicates
                     pass
 
                 if lines % 100000 == 0:

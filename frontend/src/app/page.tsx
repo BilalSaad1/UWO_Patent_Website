@@ -16,7 +16,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // filters / sort state
   const [yearFrom, setYearFrom] = useState<number | null>(null);
   const [yearTo, setYearTo] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("date");
@@ -93,7 +92,6 @@ export default function Home() {
         <div className="meta">No results yet.</div>
       ) : (
         <>
-          {/* quick totals */}
           <div className="meta">
             Found <strong>{total.toLocaleString()}</strong> inactive patent{total===1?"":"s"}
             {q ? <> for “<strong>{q}</strong>”</> : null}

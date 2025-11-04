@@ -3,8 +3,8 @@ import "./globals.css";
 import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
-  title: "Expired U.S. Patents — Western University",
-  description: "Search lapsed U.S. patents by title (inactive for non-payment).",
+  title: "Free Inactive Patents II",
+  description: "Search inactive U.S. patents (including age-expired ≥20 years).",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,17 +14,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="brandbar" />
         <div className="container">
           <header className="header">
-            <img src="/logo.svg" alt="Western" width={150} height={46} />
+            <img src="/logo.svg" alt="Western University" width={150} height={46} />
             <div className="titles">
-              <div className="kicker">Western University</div>
-              <div className="title">Expired U.S. Patents</div>
+              <div className="title">Free Inactive Patents II</div>
             </div>
-
-            {/* Header buttons are conditionally shown via HeaderNav */}
             <HeaderNav />
           </header>
         </div>
-
         {children}
       </body>
     </html>

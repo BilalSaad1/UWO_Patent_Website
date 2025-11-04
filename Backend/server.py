@@ -10,8 +10,6 @@ import db_layer as db
 
 app = FastAPI(title="UWO Patent Website API", version="0.2.0")
 
-# --- CORS ---
-# Allow the fixed list from env AND any *.trycloudflare.com subdomain.
 explicit = [o.strip() for o in settings.cors_origins if o and o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -22,7 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Models ---
 class PatentHit(BaseModel):
     patent: str
     title: str
@@ -35,20 +32,17 @@ class SearchResponse(BaseModel):
     total: int
     results: List[PatentHit]
 
-# --- Startup ---
 @app.on_event("startup")
 def _startup():
     db.init_db()
     db.seed_if_empty()
 
-# --- Routes ---
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 @app.get("/stats")
 def stats():
-    # quick db sanity: returns total rows in inactive_patents
     _, total = db.search_patents(q="", page=1, per_page=1)
     return {"total_inactive_patents": total}
 

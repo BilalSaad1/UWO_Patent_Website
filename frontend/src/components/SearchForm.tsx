@@ -56,7 +56,6 @@ export default function SearchForm({
 
   return (
     <div className="space-y-2">
-      {/* Search bar */}
       <div className="search-wrap">
         <div className="search-pill">
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ opacity: 0.7 }}>
@@ -75,13 +74,9 @@ export default function SearchForm({
         </div>
         <button className="search-btn" onClick={submit}>Search</button>
       </div>
-
-      {/* Split panels: Filters + Sort */}
       <div className="panels">
-        {/* Filters */}
         <div className="panel" aria-label="Filters">
           <div className="panel-title">
-            {/* funnel icon */}
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v5l-4 2v-7z"/></svg>
             Filters
           </div>
@@ -116,10 +111,8 @@ export default function SearchForm({
           </div>
         </div>
 
-        {/* Sort */}
         <div className="panel" aria-label="Sort">
           <div className="panel-title">
-            {/* sort icon */}
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18h8v-2h-8v2zm-6-5h14v-2H4v2zm2-7v2h12V6H6z"/></svg>
             Sort
           </div>
@@ -142,7 +135,6 @@ export default function SearchForm({
           </div>
         </div>
 
-        {/* Apply */}
         <div className="panel-actions">
           <button className="btn-outline" onClick={submit} aria-label="Apply filters and sorting">
             Apply

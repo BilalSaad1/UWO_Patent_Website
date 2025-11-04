@@ -4,7 +4,7 @@ from pathlib import Path
 import requests
 from tqdm import tqdm
 
-CHUNK = 1 << 15  # 32KB
+CHUNK = 1 << 15 
 
 def download(url: str, dest: Path, retries: int = 3, timeout: int = 90) -> Path:
     for attempt in range(retries):
