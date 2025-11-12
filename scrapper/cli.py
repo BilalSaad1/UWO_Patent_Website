@@ -4,8 +4,14 @@ from sqlalchemy import create_engine
 import os
 import re
 
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv(), override=False)
+
+if not os.getenv("DATABASE_URL"):
+    ROOT = Path(__file__).resolve().parents[1]   
+    load_dotenv(ROOT / ".env", override=True)
+    load_dotenv(ROOT / "backend" / ".env", override=True)
 
 from .paths import DOWNLOADS
 from .grants import load_grants
@@ -14,18 +20,20 @@ from .derive import rebuild_inactive
 
 def get_engine():
     url = os.getenv("DATABASE_URL")
-    assert url, "DATABASE_URL not set"
+    if not url:
+        cwd = os.getcwd()
+        raise RuntimeError(
+            "DATABASE_URL not set. Tried: cwd/find_dotenv, project .env, backend/.env. "
+            f"cwd={cwd}. Consider: `$env:DATABASE_URL=...` or create .env at repo root."
+        )
     return create_engine(url, future=True)
 
 def _is_grants_zip(p: Path) -> bool:
-    # Match historical (1976–2001 .sgm inside) and modern (2001–present .xml inside)
-    # Typical names include ipgYYMMDD.zip, pgYYMMDD.zip, or ptblxml*.zip
     n = p.name.lower()
     return (n.endswith(".zip") and
             ("ipg" in n or "pg" in n or "ptblxml" in n or re.search(r"grant|xml|sgm", n)))
 
 def _is_maint_zip(p: Path) -> bool:
-    # USPTO maintenance events zips often contain large .txt/.csv (e.g., MaintFeeEvents_YYYYMMDD.txt)
     n = p.name.lower()
     return (n.endswith(".zip") and
             ("maint" in n or "ptmnfee" in n or "maintenance" in n))
@@ -66,7 +74,6 @@ def cmd_ingest_dir(args):
                 m_total += c
                 print(f"[maint]  {n}: +{c:,} (total {m_total:,})")
             else:
-                # skip unrelated zips
                 continue
         except Exception as e:
             print(f"[skip] {n}: {e}")

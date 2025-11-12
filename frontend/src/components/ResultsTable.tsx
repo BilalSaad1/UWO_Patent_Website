@@ -4,20 +4,22 @@ const normalizeId = (pn: string) => pn.trim().replace(/\s+/g, "");
 
 const googleId = (pn: string) => {
   const raw = normalizeId(pn);
-
   if (/^US/i.test(raw)) return raw;
-
   if (/^D\d+/i.test(raw)) return `USD${raw.slice(1)}`;
-
   if (/^(RE|PP|H|T)\d+/i.test(raw)) return `US${raw.toUpperCase()}`;
-
   return `US${raw}`;
 };
 
 const googlePatentsSearchUrl = (pn: string) =>
-  `https://patents.google.com/?q=${encodeURIComponent(googleId(pn))}&oq=${encodeURIComponent(
-    pn
-  )}`;
+  `https://patents.google.com/?q=${encodeURIComponent(googleId(pn))}&oq=${encodeURIComponent(pn)}`;
+
+function formatYMDLocal(ymd: string) {
+  
+  const [y, m, d] = ymd.split("-").map((v) => parseInt(v, 10));
+  if (!y || !m || !d) return ymd;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(); 
+}
 
 export default function ResultsTable({ rows, total }: { rows: Row[]; total: number }) {
   if (!rows?.length) {
@@ -51,7 +53,7 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
                   </a>
                   {r.grant_date && (
                     <span className="pill-date">
-                      {new Date(r.grant_date).toLocaleDateString()}
+                      {formatYMDLocal(r.grant_date)}
                     </span>
                   )}
                 </div>

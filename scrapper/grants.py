@@ -23,16 +23,27 @@ def _to_yyyymmdd(s: str) -> Optional[str]:
     return None
 
 def _extract_from_tree(root: etree._Element):
-    """Namespace-agnostic pulls for PN, Title, Grant/Publication Date."""
+    """
+    Namespace-agnostic pulls for PN, Title, Grant/Publication Date.
+
+    Order:
+      1) Modern PTBLXML (us-patent-grant) fields
+      2) APS PGB (2002–2004) fields: PATDOC/B100/B110/DNUM, B540/STEXT, B140/DATE
+      3) Very generic fallbacks (unchanged)
+    """
     def first_text(path_exprs):
         for xp in path_exprs:
-            t = root.xpath(f"string({xp})")
+            try:
+                t = root.xpath(f"string({xp})")
+            except Exception:
+                t = ""
             if t:
                 t = t.strip()
                 if t:
                     return t
         return ""
 
+    # ---- (1) Modern PTBLXML (your existing paths, kept first) ----
     pn = first_text([
         "//us-bibliographic-data-grant/publication-reference/document-id/doc-number",
         "//publication-reference/document-id/doc-number",
@@ -50,27 +61,63 @@ def _extract_from_tree(root: etree._Element):
         "//*/document-id/date",
         "//*/date",
     ])
+
     pn = _norm(pn)
     title = re.sub(r"\s+", " ", _norm(title))
     gd = _to_yyyymmdd(gd)
-    return pn, title, gd
+
+    if pn and title:
+        return pn, title, gd
+
+    # ---- (2) APS PGB (2002–2004) under PATDOC ----
+    # Patent number often under B100/B110/DNUM/PDAT (designs use DNUM),
+    # Title under B540/STEXT/PDAT, Date under B140/DATE/PDAT (YYYYMMDD).
+    aps_pn = first_text([
+        ".//B100//DNUM/PDAT",
+        ".//B110//DNUM/PDAT",
+        # occasionally plain text under B110/PDAT in some dumps:
+        ".//B110/PDAT",
+    ])
+    aps_title = first_text([
+        ".//B540//STEXT/PDAT",
+        ".//B540/PDAT",
+    ])
+    aps_gd = first_text([
+        ".//B140/DATE/PDAT",
+        ".//B140/PDAT",
+    ])
+
+    aps_pn = _norm(aps_pn)
+    aps_title = re.sub(r"\s+", " ", _norm(aps_title))
+    aps_gd = _to_yyyymmdd(aps_gd)
+
+    if aps_pn and aps_title:
+        return aps_pn, aps_title, aps_gd
+
+    # ---- (3) Very generic last-ditch fallback (unchanged) ----
+    pn = first_text(["//doc-number"])
+    pn = _norm(pn)
+    if pn and title:
+        return pn, title, gd
+
+    return None, None, None
 
 def _iter_docs(zf: ZipFile, member_name: str):
     """
     Yield each document inside the weekly member.
-    - XML weekly: one big XML file containing multiple <us-patent-grant> docs
-      (not always cleanly split by XML decls).
-    - SGML (APS) weekly: .sgm with repeated <PATDOC>...</PATDOC>.
+    - XML weekly: one big XML file containing multiple <us-patent-grant> docs.
+    - SGML/XML APS weekly (PGB): repeated <PATDOC>...</PATDOC>.
     We split heuristically, keeping the opening tag with each chunk.
     """
     with zf.open(member_name) as fh:
         data = fh.read()
 
     lower_name = member_name.lower()
-    if lower_name.endswith(".sgm") or b"<PATDOC" in data.upper():
-        # --- SGML / APS --- split on <PATDOC ...> boundaries
+    upper = data.upper()
+
+    # APS PGB (2002–2004): PATDOC blocks (present in .sgm and some .xml)
+    if lower_name.endswith(".sgm") or b"<PATDOC" in upper:
         marker = b"<PATDOC"
-        upper = data.upper()
         idxs = []
         start = 0
         while True:
@@ -78,49 +125,51 @@ def _iter_docs(zf: ZipFile, member_name: str):
             if i == -1:
                 break
             idxs.append(i)
-            start = i + 7
-        if not idxs:
-            yield data  # fallback: single doc
-        else:
-            idxs.append(len(data))
-            for a, b in zip(idxs, idxs[1:]):
-                yield data[a:b]
-    else:
-        # --- XML --- try to split on <us-patent-grant ...> (more reliable than <?xml)
-        marker = b"<us-patent-grant"
-        idxs = []
-        start = 0
-        while True:
-            i = data.find(marker, start)
-            if i == -1:
-                break
-            idxs.append(i)
             start = i + len(marker)
         if not idxs:
-            # fallback: whole file might be a single patent
+            # Fall back to whole file
             yield data
         else:
             idxs.append(len(data))
             for a, b in zip(idxs, idxs[1:]):
                 yield data[a:b]
+        return
+
+    # Modern PTBLXML: us-patent-grant blocks
+    marker = b"<us-patent-grant"
+    idxs = []
+    start = 0
+    while True:
+        i = data.find(marker, start)
+        if i == -1:
+            break
+        idxs.append(i)
+        start = i + len(marker)
+    if not idxs:
+        yield data
+    else:
+        idxs.append(len(data))
+        for a, b in zip(idxs, idxs[1:]):
+            yield data[a:b]
 
 def load_grants(zip_path: Path, engine) -> int:
     total = 0
     with ZipFile(zip_path) as zf, engine.begin() as conn:
-        # pick largest .xml or .sgm member (weekly payload)
         names = [n for n in zf.namelist() if n.lower().endswith((".xml", ".sgm"))]
         if not names:
             return 0
+        # pick the largest member (unchanged)
         names.sort(key=lambda n: zf.getinfo(n).file_size, reverse=True)
         member = names[0]
 
         for doc_bytes in _iter_docs(zf, member):
-            # Try strict XML first; if that fails, try HTML parser (tolerant) as a last resort
             root = None
             try:
+                # XML parser first
                 root = etree.fromstring(doc_bytes, parser=etree.XMLParser(recover=True, huge_tree=True))
             except Exception:
                 try:
+                    # Some APS chunks are more SGML-ish; fallback to HTML tree so xpath still works
                     root = etree.HTML(doc_bytes)
                 except Exception:
                     root = None

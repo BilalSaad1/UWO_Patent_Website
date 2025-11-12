@@ -1,7 +1,6 @@
-# scrapper/derive.py
 from sqlalchemy import text
 
-EXPIRED_CODES = {"EXP","EXP.","EXP-UNP","EXP-UNE"}  # extend as needed
+EXPIRED_CODES = {"EXP","EXP.","EXP-UNP","EXP-UNE"}  
 
 def rebuild_inactive(engine) -> int:
     with engine.begin() as conn:

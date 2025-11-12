@@ -27,15 +27,54 @@ class InactivePatent(Base):
 def init_db() -> None:
     """Ensure required objects exist in the target DB."""
     with engine.begin() as conn:
+        # Extensions
         try:
             conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
         except Exception:
             pass
 
+        # Raw grants (1976–present)
+        conn.exec_driver_sql("""
+        CREATE TABLE IF NOT EXISTS grants_raw (
+            patent     TEXT PRIMARY KEY,
+            title      TEXT NOT NULL,
+            grant_date DATE
+        );
+        """)
+        conn.exec_driver_sql("""
+        CREATE INDEX IF NOT EXISTS idx_grants_raw_grant_date
+        ON grants_raw (grant_date);
+        """)
+        try:
+            conn.exec_driver_sql("""
+            CREATE INDEX IF NOT EXISTS idx_grants_raw_title_trgm
+            ON grants_raw USING GIN (title gin_trgm_ops);
+            """)
+        except Exception:
+            pass
+
+        # Raw maintenance fee events
+        conn.exec_driver_sql("""
+        CREATE TABLE IF NOT EXISTS maint_events_raw (
+            id         BIGSERIAL PRIMARY KEY,
+            patent     TEXT NOT NULL,
+            event_code TEXT NOT NULL,
+            event_date DATE NOT NULL,
+            details    TEXT
+        );
+        """)
+        conn.exec_driver_sql("""
+        CREATE INDEX IF NOT EXISTS idx_maint_patent ON maint_events_raw (patent);
+        """)
+        conn.exec_driver_sql("""
+        CREATE INDEX IF NOT EXISTS idx_maint_event_date ON maint_events_raw (event_date);
+        """)
+
+        # Derived: inactive_patents (search surface)
         conn.exec_driver_sql("""
         CREATE TABLE IF NOT EXISTS inactive_patents (
-            patent TEXT PRIMARY KEY,
-            title  TEXT NOT NULL,
+            patent     TEXT PRIMARY KEY,
+            title      TEXT NOT NULL,
             grant_date DATE
         );
         """)
@@ -71,8 +110,8 @@ def search_patents(
     per_page: int = 20,
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,
-    sort_by: str = "date",   
-    sort_dir: str = "desc",  
+    sort_by: str = "date",
+    sort_dir: str = "desc",
 ) -> Tuple[List[InactivePatent], int]:
     offset = (page - 1) * per_page
     year_from, year_to = _year_bounds(year_from, year_to)
