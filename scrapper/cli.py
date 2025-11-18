@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 from sqlalchemy import create_engine
+from sqlalchemy import text as sql_text
 import os
 import re
 
@@ -37,6 +38,27 @@ def _is_maint_zip(p: Path) -> bool:
     n = p.name.lower()
     return (n.endswith(".zip") and
             ("maint" in n or "ptmnfee" in n or "maintenance" in n))
+
+def cmd_derive(args):
+    eng = get_engine()
+    n = rebuild_inactive(eng)
+    print(f"inactive_patents rebuilt: {n:,} rows")
+
+def cmd_verify(args):
+    eng = get_engine()
+    with eng.begin() as conn:
+        a = conn.execute(sql_text("""
+            SELECT COUNT(*), MIN(grant_date), MAX(grant_date)
+            FROM grants_raw
+            WHERE grant_date BETWEEN DATE '1976-01-01' AND DATE '2001-12-31'
+        """)).first()
+        b = conn.execute(sql_text("""
+            SELECT COUNT(*), MIN(grant_date), MAX(grant_date)
+            FROM inactive_patents
+            WHERE grant_date BETWEEN DATE '1976-01-01' AND DATE '2001-12-31'
+        """)).first()
+        print("grants_raw 1976–2001:", tuple(a))
+        print("inactive_patents 1976–2001:", tuple(b))
 
 def cmd_build(args):
     eng = get_engine()
@@ -96,6 +118,12 @@ if __name__ == "__main__":
     d = sp.add_parser("ingest-dir", help="ingest ALL grants/maintenance ZIPs in a directory (recursively)")
     d.add_argument("--dir", required=True)
     d.set_defaults(func=cmd_ingest_dir)
+
+    v = sp.add_parser("verify", help="show 1976–2001 counts in grants_raw and inactive_patents")
+    v.set_defaults(func=cmd_verify)
+
+    r = sp.add_parser("derive", help="rebuild inactive_patents from grants_raw + maint_events_raw")
+    r.set_defaults(func=cmd_derive)
 
     args = ap.parse_args()
     args.func(args)
