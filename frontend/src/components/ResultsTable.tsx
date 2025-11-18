@@ -1,24 +1,21 @@
 type Row = { patent: string; title: string; grant_date?: string | null };
 
-const normalizeId = (pn: string) => pn.trim().replace(/\s+/g, "");
+const normalizeId = (pn: string) => pn.trim();
 
-const googleId = (pn: string) => {
+const usptoPatentUrl = (pn: string) => {
   const raw = normalizeId(pn);
-  if (/^US/i.test(raw)) return raw;
-  if (/^D\d+/i.test(raw)) return `USD${raw.slice(1)}`;
-  if (/^(RE|PP|H|T)\d+/i.test(raw)) return `US${raw.toUpperCase()}`;
-  return `US${raw}`;
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) {
+    return "https://patft.uspto.gov/";
+  }
+  return `https://patft.uspto.gov/netacgi/nph-Parser?patentnumber=${digits}`;
 };
 
-const googlePatentsSearchUrl = (pn: string) =>
-  `https://patents.google.com/?q=${encodeURIComponent(googleId(pn))}&oq=${encodeURIComponent(pn)}`;
-
 function formatYMDLocal(ymd: string) {
-  
   const [y, m, d] = ymd.split("-").map((v) => parseInt(v, 10));
   if (!y || !m || !d) return ymd;
   const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString(); 
+  return dt.toLocaleDateString();
 }
 
 export default function ResultsTable({ rows, total }: { rows: Row[]; total: number }) {
@@ -32,22 +29,24 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
 
   return (
     <div className="list">
-      <div className="meta small">Found {total.toLocaleString()} result{total === 1 ? "" : "s"}</div>
+      <div className="meta small">
+        Found {total.toLocaleString()} result{total === 1 ? "" : "s"}
+      </div>
 
       <ul className="list-gap">
         {rows.map((r) => {
-          const gpListUrl = googlePatentsSearchUrl(r.patent);
+          const usptoUrl = usptoPatentUrl(r.patent);
 
           return (
             <li key={r.patent} className="card">
               <div className="card-main">
                 <div className="patent-line">
                   <a
-                    href={gpListUrl}
+                    href={usptoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="patent-link"
-                    title="Open on Google Patents (search list)"
+                    title="Open on USPTO (full record)"
                   >
                     {r.patent}
                   </a>
@@ -63,11 +62,11 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
 
               <div className="card-actions">
                 <a
-                  href={gpListUrl}
+                  href={usptoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-outline"
-                  title="Open on Google Patents (search list)"
+                  title="Open on USPTO (full record)"
                 >
                   View →
                 </a>
