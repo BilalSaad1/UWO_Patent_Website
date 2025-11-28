@@ -69,9 +69,19 @@ def cmd_build(args):
 
 def cmd_latest(args):
     eng = get_engine()
-    zips = sorted(DOWNLOADS.glob("*.zip"))
-    grants_zip = next(z for z in zips if "ipg" in z.name.lower() or "ptblxml" in z.name.lower() or "pg" in z.name.lower())
-    maint_zip  = next(z for z in zips if "maint" in z.name.lower() or "ptmnfee" in z.name.lower())
+    zips = sorted(DOWNLOADS.rglob("*.zip"))
+    if not zips:
+        raise SystemExit(f"No .zip files found under {DOWNLOADS}")
+    try:
+        grants_zip = next(z for z in zips if _is_grants_zip(z))
+    except StopIteration:
+        raise SystemExit(f"No grant ZIP file found under {DOWNLOADS}")
+    try:
+        maint_zip = next(z for z in zips if _is_maint_zip(z))
+    except StopIteration:
+        raise SystemExit(f"No maintenance ZIP file found under {DOWNLOADS}")
+    print(f"Using grant ZIP: {grants_zip.name}")
+    print(f"Using maint ZIP: {maint_zip.name}")
     g_count = load_grants(grants_zip, eng)
     m_count = load_maintenance(maint_zip, eng)
     i_count = rebuild_inactive(eng)
