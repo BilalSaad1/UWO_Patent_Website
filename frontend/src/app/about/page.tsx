@@ -20,14 +20,14 @@ export default function AboutPage() {
 
       <div style={{ maxWidth: 900, fontSize: 16, lineHeight: 1.6 }}>
         <p>
-          To find patents that have merely expired you can simply set your search
-          terms to look for patents that are 20 years old or older. Finding a list
-          of inactive patents, however, is far more challenging. This website
-          overcomes that challenge as it allows you to search through all inactive
-          patents in the U.S. that are less than 20 years old. <strong>We also have
-          loaded all patents that have expired from age (20 years or older).</strong> We
-          created this database to help drive open source hardware (OSH)
-          development. Our previous work has found that{" "}
+          To find patents that have merely expired you can simply set your
+          search terms to look for patents that are 20 years old or older.
+          Finding a list of inactive patents, however, is far more challenging.
+          This website overcomes that challenge as it allows you to search
+          through all inactive patents in the U.S. that are less than 20 years
+          old, and we also have loaded all patents that have expired from age
+          (20 years or older). We created this database to help drive open
+          source hardware (OSH) development. Our previous work has found that{" "}
           <a
             href="https://www.academia.edu/11677580/The_Case_for_Weaker_Patents"
             target="_blank"
@@ -94,8 +94,8 @@ export default function AboutPage() {
         </p>
 
         <p>
-          Our hope is that this database accelerates your open source development
-          for the benefit of all humankind.
+          Our hope is that this database accelerates your open source
+          development for the benefit of all humankind.
         </p>
 
         <p>
@@ -118,7 +118,11 @@ export default function AboutPage() {
 
         <p>
           The{" "}
-          <a href="https://www.appropedia.org/FAST" target="_blank" rel="noreferrer">
+          <a
+            href="https://www.appropedia.org/FAST"
+            target="_blank"
+            rel="noreferrer"
+          >
             Free Appropriate Sustainable Technology (FAST)
           </a>{" "}
           research group run by{" "}
@@ -141,8 +145,8 @@ export default function AboutPage() {
           >
             #3 in the world for sustainability
           </a>
-          . FAST helps Western achieve its sustainability goals as they explore the
-          way{" "}
+          . FAST helps Western achieve its sustainability goals as they explore
+          the way{" "}
           <a
             href="https://www.appropedia.org/Photovoltaics"
             target="_blank"
@@ -167,11 +171,15 @@ export default function AboutPage() {
             open source appropriate technologies
           </a>{" "}
           (or OSAT) and{" "}
-          <a href="https://www.appropedia.org/RepRap" target="_blank" rel="noreferrer">
+          <a
+            href="https://www.appropedia.org/RepRap"
+            target="_blank"
+            rel="noreferrer"
+          >
             RepRap
           </a>{" "}
-          3-D printing can drive distributed recycling and additive manufacturing
-          (DRAM) (and maybe even social change).
+          3-D printing can drive distributed recycling and additive
+          manufacturing (DRAM) (and maybe even social change).
         </p>
 
         <p>
@@ -195,8 +203,9 @@ export default function AboutPage() {
             >
               FAST methods
             </a>{" "}
-            — Exactly how we do what we do (including detailed instructions for our
-            open-source 3D printers and scientific equipment) to make your own{" "}
+            — Exactly how we do what we do (including detailed instructions for
+            our open-source 3D printers and scientific equipment) to make your
+            own{" "}
             <a
               href="https://www.appropedia.org/Open-source_Lab"
               target="_blank"
@@ -225,7 +234,11 @@ export default function AboutPage() {
               FAST Publications By Topic
             </a>
             :{" "}
-            <a href="https://www.appropedia.org/FAST_Agrivoltaics" target="_blank" rel="noreferrer">
+            <a
+              href="https://www.appropedia.org/FAST_Agrivoltaics"
+              target="_blank"
+              rel="noreferrer"
+            >
               Agrivoltaics
             </a>{" "}
             ·{" "}
@@ -250,7 +263,7 @@ export default function AboutPage() {
               target="_blank"
               rel="noreferrer"
             >
-              Floatovoltaivs
+              Floatovoltaics
             </a>{" "}
             ·{" "}
             <a
@@ -301,7 +314,11 @@ export default function AboutPage() {
               Photovoltaic Systems
             </a>{" "}
             ·{" "}
-            <a href="https://www.appropedia.org/FAST_food" target="_blank" rel="noreferrer">
+            <a
+              href="https://www.appropedia.org/FAST_food"
+              target="_blank"
+              rel="noreferrer"
+            >
               Resilient Food
             </a>{" "}
             ·{" "}
@@ -349,7 +366,16 @@ export default function AboutPage() {
             rel="noreferrer"
           >
             BilalSaad1/UWO_Patent_Website
+          </a>{" "}
+          (GNU General Public License v3.0). Archived at OSF:&nbsp;
+          <a
+            href="https://osf.io/your-project-id-here"
+            target="_blank"
+            rel="noreferrer"
+          >
+            OSF project page
           </a>
+          .
         </p>
       </div>
     </main>
