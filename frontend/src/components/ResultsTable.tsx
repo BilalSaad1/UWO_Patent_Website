@@ -2,13 +2,14 @@ type Row = { patent: string; title: string; grant_date?: string | null };
 
 const normalizeId = (pn: string) => pn.trim();
 
-const usptoPatentUrl = (pn: string) => {
+const googlePatentUrl = (pn: string) => {
   const raw = normalizeId(pn);
   const digits = raw.replace(/\D/g, "");
   if (!digits) {
-    return "https://patft.uspto.gov/";
+    // Fallback: generic Google Patents page
+    return "https://patents.google.com/";
   }
-  return `https://patft.uspto.gov/netacgi/nph-Parser?patentnumber=${digits}`;
+  return `https://patents.google.com/patent/US${digits}`;
 };
 
 function formatYMDLocal(ymd: string) {
@@ -35,18 +36,18 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
 
       <ul className="list-gap">
         {rows.map((r) => {
-          const usptoUrl = usptoPatentUrl(r.patent);
+          const googleUrl = googlePatentUrl(r.patent);
 
           return (
             <li key={r.patent} className="card">
               <div className="card-main">
                 <div className="patent-line">
                   <a
-                    href={usptoUrl}
+                    href={googleUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="patent-link"
-                    title="Open on USPTO (full record)"
+                    title="Open on Google Patents (full record)"
                   >
                     {r.patent}
                   </a>
@@ -62,11 +63,11 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
 
               <div className="card-actions">
                 <a
-                  href={usptoUrl}
+                  href={googleUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-outline"
-                  title="Open on USPTO (full record)"
+                  title="Open on Google Patents (full record)"
                 >
                   View →
                 </a>
