@@ -4,7 +4,7 @@ import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
   title: "Free Inactive Patents II",
-  description: "Search inactive U.S. patents (including age-expired ≥20 years).",
+  description: "Search inactive patents by jurisdiction (US now; more jurisdictions coming).",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

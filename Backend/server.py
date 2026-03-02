@@ -20,10 +20,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class PatentHit(BaseModel):
     patent: str
     title: str
     grant_date: Optional[date] = None
+
 
 class SearchResponse(BaseModel):
     q: str
@@ -32,19 +34,23 @@ class SearchResponse(BaseModel):
     total: int
     results: List[PatentHit]
 
+
 @app.on_event("startup")
 def _startup():
     db.init_db()
     db.seed_if_empty()
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+
 @app.get("/stats")
 def stats():
-    _, total = db.search_patents(q="", page=1, per_page=1)
+    _, total = db.search_patents(q="", page=1, per_page=1, jurisdiction="US")
     return {"total_inactive_patents": total}
+
 
 @app.get("/search", response_model=SearchResponse)
 def search(
@@ -52,9 +58,10 @@ def search(
     page: int = Query(1, ge=1, le=1000),
     per_page: int = Query(20, ge=1, le=100),
     year_from: Optional[int] = Query(None, ge=1900, le=2100),
-    year_to:   Optional[int] = Query(None, ge=1900, le=2100),
-    sort_by:   str = Query("date", pattern="^(date|title)$"),
-    sort_dir:  str = Query("desc", pattern="^(asc|desc)$"),
+    year_to: Optional[int] = Query(None, ge=1900, le=2100),
+    sort_by: str = Query("date", pattern="^(date|title)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    jurisdiction: str = Query("US", pattern="^(US|JP|ALL)$"),
 ):
     rows, total = db.search_patents(
         q=q,
@@ -64,18 +71,25 @@ def search(
         year_to=year_to,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        jurisdiction=jurisdiction,
     )
     return SearchResponse(
         q=q,
         page=page,
         per_page=per_page,
         total=total,
-        results=[PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date) for r in rows],
+        results=[
+            PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date) for r in rows
+        ],
     )
 
+
 @app.get("/patents/{number}", response_model=PatentHit)
-def get_patent(number: str):
-    r = db.get_patent(number)
+def get_patent(
+    number: str,
+    jurisdiction: str = Query("US", pattern="^(US|JP|ALL)$"),
+):
+    r = db.get_patent(number, jurisdiction=jurisdiction)
     if not r:
         raise HTTPException(status_code=404, detail="Not found")
     return PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date)

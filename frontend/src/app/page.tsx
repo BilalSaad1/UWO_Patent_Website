@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import ResultsTable from "@/components/ResultsTable";
-import SearchForm, { SortBy, SortDir } from "@/components/SearchForm";
+import SearchForm, { SortBy, SortDir, Jurisdiction } from "@/components/SearchForm";
 
 type Hit = {
   patent: string;
@@ -32,6 +32,7 @@ export default function Home() {
   const [yearTo, setYearTo] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [jurisdiction, setJurisdiction] = useState<Jurisdiction>("US");
 
   async function fetchResults(
     nextPage = 1,
@@ -41,6 +42,7 @@ export default function Home() {
       year_to?: number | null;
       sort_by?: SortBy;
       sort_dir?: SortDir;
+      jurisdiction?: Jurisdiction;
     }
   ) {
     const _q = (params?.q ?? q).trim();
@@ -50,6 +52,7 @@ export default function Home() {
     const yt = params?.year_to ?? yearTo;
     const sb = params?.sort_by ?? sortBy;
     const sd = params?.sort_dir ?? sortDir;
+    const jur = params?.jurisdiction ?? jurisdiction;
 
     setLoading(true);
     setErr(null);
@@ -61,6 +64,7 @@ export default function Home() {
         per_page: String(PER_PAGE),
         sort_by: sb,
         sort_dir: sd,
+        jurisdiction: jur,
       });
 
       if (yf) usp.set("year_from", String(yf));
@@ -80,6 +84,7 @@ export default function Home() {
       setYearTo(yt ?? null);
       setSortBy(sb);
       setSortDir(sd);
+      setJurisdiction(jur);
 
       setRows(data.results);
       setTotal(data.total);
@@ -98,11 +103,18 @@ export default function Home() {
   const from = total ? (page - 1) * PER_PAGE + 1 : 0;
   const to = total ? Math.min(page * PER_PAGE, total) : 0;
 
+  const jurLabel =
+    jurisdiction === "US"
+      ? "United States"
+      : jurisdiction === "JP"
+      ? "Japan"
+      : "All jurisdictions";
+
   return (
     <div className="container">
-      <h1 className="section-title">Find inactive U.S. patents</h1>
+      <h1 className="section-title">Find inactive patents</h1>
       <div className="section-sub">
-        Search by title keyword. Results include patent number, title, and grant date.
+        Search by title keyword. Results include patent number, title, and grant date (when available).
       </div>
 
       <SearchForm
@@ -111,26 +123,25 @@ export default function Home() {
         defaultYearTo={yearTo}
         defaultSortBy={sortBy}
         defaultSortDir={sortDir}
+        defaultJurisdiction={jurisdiction}
         onSearch={(p) => fetchResults(1, p)}
       />
 
       {err && <div className="meta">{err}</div>}
 
-      {!rows.length && !loading ? (
-        <div className="meta">No results yet.</div>
-      ) : null}
+      {!rows.length && !loading ? <div className="meta">No results yet.</div> : null}
 
       {rows.length > 0 && (
         <>
           <div className="meta">
-            Found <strong>{total.toLocaleString()}</strong> inactive patent
-            {total === 1 ? "" : "s"}
+            Found <strong>{total.toLocaleString()}</strong> inactive patent{total === 1 ? "" : "s"}
             {q ? (
               <>
                 {" "}
                 for “<strong>{q}</strong>”
               </>
             ) : null}
+            <> • <strong>{jurLabel}</strong></>
             {yearFrom ? (
               <>
                 {" "}
@@ -143,9 +154,7 @@ export default function Home() {
                 • to <strong>{yearTo}</strong>
               </>
             ) : null}
-            <> • sorted by{" "}
-              <strong>{sortBy === "date" ? "grant date" : "title"}</strong> ({sortDir})
-            </>
+            <> • sorted by <strong>{sortBy === "date" ? "grant date" : "title"}</strong> ({sortDir})</>
           </div>
 
           <div className="meta">
@@ -177,7 +186,7 @@ export default function Home() {
       )}
 
       <div className="meta" style={{ marginTop: 18 }}>
-        Data from USPTO Open Data (weekly). Open-source (GPL-3.0).
+        Data from USPTO Open Data (weekly) and planned ingestion for other jurisdictions. Open-source (GPL-3.0).
       </div>
     </div>
   );

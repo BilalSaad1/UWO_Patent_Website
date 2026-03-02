@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 export type SortBy = "date" | "title";
 export type SortDir = "asc" | "desc";
+export type Jurisdiction = "US" | "JP" | "ALL";
 
 type Props = {
   onSearch: (params: {
@@ -11,12 +12,14 @@ type Props = {
     year_to?: number | null;
     sort_by: SortBy;
     sort_dir: SortDir;
+    jurisdiction: Jurisdiction;
   }) => void;
   defaultQuery?: string;
   defaultYearFrom?: number | null;
   defaultYearTo?: number | null;
   defaultSortBy?: SortBy;
   defaultSortDir?: SortDir;
+  defaultJurisdiction?: Jurisdiction;
 };
 
 export default function SearchForm({
@@ -26,12 +29,14 @@ export default function SearchForm({
   defaultYearTo = null,
   defaultSortBy = "date",
   defaultSortDir = "desc",
+  defaultJurisdiction = "US",
 }: Props) {
   const [q, setQ] = useState(defaultQuery);
   const [yearFrom, setYearFrom] = useState<number | "">(defaultYearFrom ?? "");
   const [yearTo, setYearTo] = useState<number | "">(defaultYearTo ?? "");
   const [sortBy, setSortBy] = useState<SortBy>(defaultSortBy);
   const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
+  const [jurisdiction, setJurisdiction] = useState<Jurisdiction>(defaultJurisdiction);
 
   const years = useMemo(() => {
     const now = new Date().getFullYear();
@@ -47,6 +52,7 @@ export default function SearchForm({
       year_to: yearTo === "" ? null : Number(yearTo),
       sort_by: sortBy,
       sort_dir: sortDir,
+      jurisdiction,
     });
   }
 
@@ -74,12 +80,16 @@ export default function SearchForm({
         </div>
         <button className="search-btn" onClick={submit}>Search</button>
       </div>
+
       <div className="panels">
         <div className="panel" aria-label="Filters">
           <div className="panel-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v5l-4 2v-7z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M3 5h18l-7 8v5l-4 2v-7z" />
+            </svg>
             Filters
           </div>
+
           <div className="panel-row">
             <div className="filters-group">
               <label className="filters-label">Year from</label>
@@ -108,14 +118,30 @@ export default function SearchForm({
                 ))}
               </select>
             </div>
+
+            <div className="filters-group">
+              <label className="filters-label">Jurisdiction</label>
+              <select
+                value={jurisdiction}
+                onChange={(e) => setJurisdiction(e.target.value as Jurisdiction)}
+                className="filters-select"
+              >
+                <option value="US">United States</option>
+                <option value="JP">Japan</option>
+                <option value="ALL">All</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <div className="panel" aria-label="Sort">
           <div className="panel-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18h8v-2h-8v2zm-6-5h14v-2H4v2zm2-7v2h12V6H6z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M10 18h8v-2h-8v2zm-6-5h14v-2H4v2zm2-7v2h12V6H6z" />
+            </svg>
             Sort
           </div>
+
           <div className="panel-row">
             <div className="filters-group">
               <label className="filters-label">Sort by</label>

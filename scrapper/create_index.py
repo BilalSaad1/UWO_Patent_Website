@@ -3,11 +3,11 @@ from sqlalchemy import text
 
 SQL = """
 CREATE TABLE IF NOT EXISTS patents_index (
-  jurisdiction TEXT NOT NULL,       -- 'US' or 'CN'
-  patent_id TEXT NOT NULL,           -- US: patent number, CN: chosen id later
+  jurisdiction TEXT NOT NULL,       -- 'US' or 'JP'
+  patent_id TEXT NOT NULL,           -- identifier within the jurisdiction
   title TEXT,
-  date DATE,                         -- US: grant_date; CN: inactive_date (or pub_date if needed)
-  inactive_reason TEXT,              -- 'FEES'/'TERM'/NULL
+  date DATE,                         -- display date (grant/publication/etc.)
+  inactive_reason TEXT,              -- 'FEES'/'TERM'/NULL (optional)
   PRIMARY KEY (jurisdiction, patent_id)
 );
 

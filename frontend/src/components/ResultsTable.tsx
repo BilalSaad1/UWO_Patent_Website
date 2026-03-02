@@ -1,14 +1,20 @@
 type Row = { patent: string; title: string; grant_date?: string | null };
 
-const normalizeId = (pn: string) => pn.trim();
+const normalizeId = (pn: string) => (pn || "").trim();
 
 const googlePatentUrl = (pn: string) => {
   const raw = normalizeId(pn);
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) {
-    // Fallback: generic Google Patents page
-    return "https://patents.google.com/";
+  if (!raw) return "https://patents.google.com/";
+
+  // If it already looks like a country-prefixed publication (e.g., CN1234567A),
+  // use it directly.
+  if (/^[A-Za-z]{2}\d/.test(raw)) {
+    return `https://patents.google.com/patent/${raw}`;
   }
+
+  // US fallback: use digits
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "https://patents.google.com/";
   return `https://patents.google.com/patent/US${digits}`;
 };
 
