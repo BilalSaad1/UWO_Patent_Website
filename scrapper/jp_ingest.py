@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import tarfile
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Iterable, List, Optional
@@ -122,10 +123,39 @@ def _is_inactive_reason(
     return None
 
 
+def _translate_titles(titles: List[str]) -> List[Optional[str]]:
+    """
+    Translate a list of Japanese titles to English using Google Translate (free).
+    Returns a list of the same length; entries are None if translation failed.
+    Translates in sub-batches of 50 to stay within free API limits.
+    """
+    try:
+        from deep_translator import GoogleTranslator
+    except ImportError:
+        return [None] * len(titles)
+
+    results: List[Optional[str]] = []
+    chunk_size = 50
+    for i in range(0, len(titles), chunk_size):
+        chunk = titles[i : i + chunk_size]
+        try:
+            translated = GoogleTranslator(source="ja", target="en").translate_batch(chunk)
+            for orig, en in zip(chunk, translated):
+                # If translation returned the same string or empty, store None
+                results.append(en if en and en.strip() and en.strip() != orig else None)
+        except Exception:
+            results.extend([None] * len(chunk))
+        if i + chunk_size < len(titles):
+            time.sleep(0.5)  # be polite to the free API between chunks
+
+    return results
+
+
 @dataclass
 class JpRow:
     patent_id: str
     title: str
+    title_en: Optional[str]
     date: Optional[date]
     inactive_reason: str
 
@@ -195,6 +225,7 @@ def _iter_mgt_rows_from_member(tf: tarfile.TarFile, member_name: str, today: dat
         yield JpRow(
             patent_id=patent_id,
             title=title,
+            title_en=None,  # filled in during flush
             date=display_date,
             inactive_reason=reason,
         )
@@ -218,6 +249,7 @@ def ingest_jpdrp_to_index(jpdrp_tar_gz: str) -> int:
                     jurisdiction    TEXT NOT NULL,
                     patent_id       TEXT NOT NULL,
                     title           TEXT,
+                    title_en        TEXT,
                     date            DATE,
                     inactive_reason TEXT,
                     PRIMARY KEY (jurisdiction, patent_id)
@@ -225,30 +257,49 @@ def ingest_jpdrp_to_index(jpdrp_tar_gz: str) -> int:
                 """
             )
         )
+        # Add title_en column if the table already exists without it
+        conn.execute(
+            text(
+                "ALTER TABLE patents_index ADD COLUMN IF NOT EXISTS title_en TEXT;"
+            )
+        )
 
     total = 0
-    batch: List[dict] = []
+    row_batch: List[JpRow] = []
 
     def flush():
-        nonlocal batch, total
-        if not batch:
+        nonlocal row_batch, total
+        if not row_batch:
             return
+        # Translate Japanese titles to English in bulk before inserting
+        english = _translate_titles([r.title for r in row_batch])
+        dicts = [
+            {
+                "patent_id": r.patent_id,
+                "title": r.title,
+                "title_en": en,
+                "date": r.date,
+                "inactive_reason": r.inactive_reason,
+            }
+            for r, en in zip(row_batch, english)
+        ]
         with eng.begin() as conn:
             conn.execute(
                 text(
                     """
-                    INSERT INTO patents_index (jurisdiction, patent_id, title, date, inactive_reason)
-                    VALUES ('JP', :patent_id, :title, :date, :inactive_reason)
+                    INSERT INTO patents_index (jurisdiction, patent_id, title, title_en, date, inactive_reason)
+                    VALUES ('JP', :patent_id, :title, :title_en, :date, :inactive_reason)
                     ON CONFLICT (jurisdiction, patent_id) DO UPDATE
-                      SET title = EXCLUDED.title,
-                          date  = EXCLUDED.date,
+                      SET title           = EXCLUDED.title,
+                          title_en        = EXCLUDED.title_en,
+                          date            = EXCLUDED.date,
                           inactive_reason = EXCLUDED.inactive_reason;
                     """
                 ),
-                batch,
+                dicts,
             )
-        total += len(batch)
-        batch = []
+        total += len(row_batch)
+        row_batch = []
 
     with tarfile.open(jpdrp_tar_gz, "r:gz") as tf:
         names = [m.name for m in tf.getmembers() if m.isfile()]
@@ -258,15 +309,8 @@ def ingest_jpdrp_to_index(jpdrp_tar_gz: str) -> int:
 
         for member_name in targets:
             for row in _iter_mgt_rows_from_member(tf, member_name, today):
-                batch.append(
-                    {
-                        "patent_id": row.patent_id,
-                        "title": row.title,
-                        "date": row.date,
-                        "inactive_reason": row.inactive_reason,
-                    }
-                )
-                if len(batch) >= 5000:
+                row_batch.append(row)
+                if len(row_batch) >= 5000:
                     flush()
 
         flush()

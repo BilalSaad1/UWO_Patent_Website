@@ -1,4 +1,4 @@
-type Row = { patent: string; title: string; grant_date?: string | null };
+type Row = { patent: string; title: string; title_en?: string | null; grant_date?: string | null };
 
 const normalizeId = (pn: string) => (pn || "").trim();
 
@@ -65,6 +65,9 @@ export default function ResultsTable({ rows, total }: { rows: Row[]; total: numb
                 </div>
 
                 <div className="title-line">{r.title}</div>
+                {r.title_en && (
+                  <div className="title-line-en">{r.title_en}</div>
+                )}
               </div>
 
               <div className="card-actions">

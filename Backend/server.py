@@ -24,6 +24,7 @@ app.add_middleware(
 class PatentHit(BaseModel):
     patent: str
     title: str
+    title_en: Optional[str] = None
     grant_date: Optional[date] = None
 
 
@@ -79,7 +80,7 @@ def search(
         per_page=per_page,
         total=total,
         results=[
-            PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date) for r in rows
+            PatentHit(patent=r.patent, title=r.title, title_en=getattr(r, "title_en", None), grant_date=r.grant_date) for r in rows
         ],
     )
 
@@ -92,4 +93,4 @@ def get_patent(
     r = db.get_patent(number, jurisdiction=jurisdiction)
     if not r:
         raise HTTPException(status_code=404, detail="Not found")
-    return PatentHit(patent=r.patent, title=r.title, grant_date=r.grant_date)
+    return PatentHit(patent=r.patent, title=r.title, title_en=getattr(r, "title_en", None), grant_date=r.grant_date)

@@ -42,6 +42,7 @@ class PatentIndex(Base):
     jurisdiction: Mapped[str] = mapped_column(String, primary_key=True)
     patent_id: Mapped[str] = mapped_column(String, primary_key=True)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
+    title_en: Mapped[str | None] = mapped_column(String, nullable=True)
     date: Mapped[date | None] = mapped_column(Date)
     inactive_reason: Mapped[str | None] = mapped_column(String, nullable=True)
 
@@ -133,11 +134,16 @@ def init_db() -> None:
             jurisdiction    TEXT NOT NULL,
             patent_id       TEXT NOT NULL,
             title           TEXT,
+            title_en        TEXT,
             date            DATE,
             inactive_reason TEXT,
             PRIMARY KEY (jurisdiction, patent_id)
         );
         """
+        )
+        # Add title_en column if table was created before this column existed
+        conn.exec_driver_sql(
+            "ALTER TABLE patents_index ADD COLUMN IF NOT EXISTS title_en TEXT;"
         )
         conn.exec_driver_sql(
             """
@@ -262,6 +268,7 @@ def search_patents(
             fake = InactivePatent()
             fake.patent = r.patent_id
             fake.title = r.title or ""
+            fake.title_en = r.title_en
             fake.grant_date = r.date
             out.append(fake)
 
@@ -296,5 +303,6 @@ def get_patent(number: str, jurisdiction: str = "US") -> InactivePatent | None:
         fake = InactivePatent()
         fake.patent = r.patent_id
         fake.title = r.title or ""
+        fake.title_en = r.title_en
         fake.grant_date = r.date
         return fake
