@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 import os
 import re
 
-from sqlalchemy import create_engine, String, Date, select, func, text, and_
+from sqlalchemy import create_engine, String, Date, select, func, text, and_, or_
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 
 DATABASE_URL = os.getenv(
@@ -210,7 +210,13 @@ def search_patents(
     with Session(engine) as s:
         # base condition (tokens -> AND)
         if tokens:
-            cond = and_(*[PatentIndex.title.ilike(f"%{t}%") for t in tokens])
+            cond = and_(*[
+                or_(
+                    PatentIndex.title.ilike(f"%{t}%"),
+                    PatentIndex.title_en.ilike(f"%{t}%"),
+                )
+                for t in tokens
+            ])
         else:
             cond = text("TRUE")
 

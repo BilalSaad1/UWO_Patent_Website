@@ -32,4 +32,24 @@ def rebuild_inactive(engine) -> int:
             JOIN grants_raw g ON g.patent = u.patent
         """), {"codes": list(EXPIRED_CODES)})
         cnt = conn.execute(text("SELECT count(*) FROM inactive_patents")).scalar_one()
+
+        # Keep patents_index in sync: replace all US rows with current inactive set
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS patents_index (
+                jurisdiction    TEXT NOT NULL,
+                patent_id       TEXT NOT NULL,
+                title           TEXT,
+                title_en        TEXT,
+                date            DATE,
+                inactive_reason TEXT,
+                PRIMARY KEY (jurisdiction, patent_id)
+            );
+        """))
+        conn.execute(text("DELETE FROM patents_index WHERE jurisdiction = 'US'"))
+        conn.execute(text("""
+            INSERT INTO patents_index (jurisdiction, patent_id, title, date, inactive_reason)
+            SELECT 'US', patent, title, grant_date, NULL
+            FROM inactive_patents
+        """))
+
         return int(cnt)
