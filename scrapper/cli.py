@@ -10,7 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv(), override=False)
 
 if not os.getenv("DATABASE_URL"):
-    ROOT = Path(__file__).resolve().parents[1]   
+    ROOT = Path(__file__).resolve().parents[1]
     load_dotenv(ROOT / ".env", override=True)
     load_dotenv(ROOT / "backend" / ".env", override=True)
 
@@ -18,6 +18,10 @@ from .paths import DOWNLOADS
 from .grants import load_grants
 from .maintenance import load_maintenance
 from .derive import rebuild_inactive
+
+# NEW: JP ingest
+from .jp_ingest import ingest_jpdrp_to_index
+
 
 def get_engine():
     url = os.getenv("DATABASE_URL")
@@ -29,36 +33,50 @@ def get_engine():
         )
     return create_engine(url, future=True)
 
+
 def _is_grants_zip(p: Path) -> bool:
     n = p.name.lower()
-    return (n.endswith(".zip") and
-            ("ipg" in n or "pg" in n or "ptblxml" in n or re.search(r"grant|xml|sgm", n)))
+    return (
+        n.endswith(".zip")
+        and ("ipg" in n or "pg" in n or "ptblxml" in n or re.search(r"grant|xml|sgm", n))
+    )
+
 
 def _is_maint_zip(p: Path) -> bool:
     n = p.name.lower()
-    return (n.endswith(".zip") and
-            ("maint" in n or "ptmnfee" in n or "maintenance" in n))
+    return n.endswith(".zip") and ("maint" in n or "ptmnfee" in n or "maintenance" in n)
+
 
 def cmd_derive(args):
     eng = get_engine()
     n = rebuild_inactive(eng)
     print(f"inactive_patents rebuilt: {n:,} rows")
 
+
 def cmd_verify(args):
     eng = get_engine()
     with eng.begin() as conn:
-        a = conn.execute(sql_text("""
+        a = conn.execute(
+            sql_text(
+                """
             SELECT COUNT(*), MIN(grant_date), MAX(grant_date)
             FROM grants_raw
             WHERE grant_date BETWEEN DATE '1976-01-01' AND DATE '2001-12-31'
-        """)).first()
-        b = conn.execute(sql_text("""
+        """
+            )
+        ).first()
+        b = conn.execute(
+            sql_text(
+                """
             SELECT COUNT(*), MIN(grant_date), MAX(grant_date)
             FROM inactive_patents
             WHERE grant_date BETWEEN DATE '1976-01-01' AND DATE '2001-12-31'
-        """)).first()
+        """
+            )
+        ).first()
         print("grants_raw 1976–2001:", tuple(a))
         print("inactive_patents 1976–2001:", tuple(b))
+
 
 def cmd_build(args):
     eng = get_engine()
@@ -66,6 +84,7 @@ def cmd_build(args):
     m_count = load_maintenance(Path(args.maint_zip), eng)
     i_count = rebuild_inactive(eng)
     print(f"grants: {g_count:,}, maint: {m_count:,}, inactive now: {i_count:,}")
+
 
 def cmd_latest(args):
     eng = get_engine()
@@ -86,6 +105,7 @@ def cmd_latest(args):
     m_count = load_maintenance(maint_zip, eng)
     i_count = rebuild_inactive(eng)
     print(f"grants: {g_count:,}, maint: {m_count:,}, inactive now: {i_count:,}")
+
 
 def cmd_ingest_dir(args):
     """Ingest ALL .zip files in a directory (recursively). Run derive once at the end."""
@@ -113,27 +133,42 @@ def cmd_ingest_dir(args):
     i_count = rebuild_inactive(eng)
     print(f"== DONE == grants: {g_total:,}, maint: {m_total:,}, inactive now: {i_count:,}")
 
+
+# NEW: Japan ingest command (JPDRP tar.gz -> patents_index)
+def cmd_jp_ingest(args):
+    jp_tar = Path(args.jpdrp_tar).resolve()
+    if not jp_tar.exists():
+        raise SystemExit(f"JPDRP tar not found: {jp_tar}")
+    n = ingest_jpdrp_to_index(str(jp_tar))
+    print(f"[JP] patents_index upserted: {n:,} rows")
+
+
 if __name__ == "__main__":
     ap = ArgumentParser("scrapper")
     sp = ap.add_subparsers(dest="cmd", required=True)
 
-    b = sp.add_parser("build", help="ingest specific ZIP files and derive")
+    b = sp.add_parser("build", help="ingest specific ZIP files and derive (US)")
     b.add_argument("--grants-zip", required=True)
     b.add_argument("--maint-zip", required=True)
     b.set_defaults(func=cmd_build)
 
-    l = sp.add_parser("latest", help="ingest the two ZIPs present in data/downloads/")
+    l = sp.add_parser("latest", help="ingest the two ZIPs present in data/downloads/ (US)")
     l.set_defaults(func=cmd_latest)
 
-    d = sp.add_parser("ingest-dir", help="ingest ALL grants/maintenance ZIPs in a directory (recursively)")
+    d = sp.add_parser("ingest-dir", help="ingest ALL grants/maintenance ZIPs in a directory (recursively) (US)")
     d.add_argument("--dir", required=True)
     d.set_defaults(func=cmd_ingest_dir)
 
-    v = sp.add_parser("verify", help="show 1976–2001 counts in grants_raw and inactive_patents")
+    v = sp.add_parser("verify", help="show 1976–2001 counts in grants_raw and inactive_patents (US)")
     v.set_defaults(func=cmd_verify)
 
-    r = sp.add_parser("derive", help="rebuild inactive_patents from grants_raw + maint_events_raw")
+    r = sp.add_parser("derive", help="rebuild inactive_patents from grants_raw + maint_events_raw (US)")
     r.set_defaults(func=cmd_derive)
+
+    # NEW
+    j = sp.add_parser("jp-ingest", help="ingest JPDRP_YYYYMMDD.tar.gz into patents_index as JP (inactive only)")
+    j.add_argument("--jpdrp-tar", required=True, help="Path to JPDRP_YYYYMMDD.tar.gz")
+    j.set_defaults(func=cmd_jp_ingest)
 
     args = ap.parse_args()
     args.func(args)
